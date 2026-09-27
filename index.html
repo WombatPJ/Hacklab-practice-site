@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>HackLab — Hacking Practice</title>
+<style>
+:root{--bg:#07100d;--panel:#0d1b16;--panel2:#10231c;--line:#1d4032;--text:#d7f7e7;--muted:#7ea995;--green:#42f58d;--red:#ff6577;--yellow:#ffd166}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at top,#10271d 0,#07100d 45%,#040907 100%);color:var(--text);font:15px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+header{padding:28px 5vw;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;gap:20px;align-items:center}
+.logo{font-size:24px;font-weight:800;color:var(--green)} .tag{color:var(--muted)}
+main{max-width:1200px;margin:auto;padding:28px 5vw}.grid{display:grid;grid-template-columns:280px 1fr;gap:22px}
+.panel{background:rgba(13,27,22,.92);border:1px solid var(--line);border-radius:14px;padding:18px;box-shadow:0 10px 30px #0005}
+.challenge{display:block;width:100%;text-align:left;background:none;border:1px solid transparent;color:var(--text);padding:12px;border-radius:10px;cursor:pointer;font:inherit;margin:4px 0}
+.challenge:hover,.challenge.active{background:var(--panel2);border-color:var(--line)} .challenge small{display:block;color:var(--muted);margin-top:3px}
+h1,h2{margin-top:0}h1{font-size:30px}h2{color:var(--green)}
+.badge{display:inline-block;border:1px solid var(--line);border-radius:999px;padding:3px 9px;color:var(--green);font-size:12px}
+pre{background:#030705;border:1px solid #18362a;padding:15px;border-radius:10px;overflow:auto;color:#b9eecf}
+input,button{font:inherit}input{width:100%;padding:11px;background:#06100c;border:1px solid #27513e;color:var(--text);border-radius:8px;margin:7px 0 10px}
+button.primary{padding:10px 15px;border:0;border-radius:8px;background:var(--green);color:#031009;font-weight:800;cursor:pointer}
+button.secondary{padding:9px 13px;border:1px solid #315b47;border-radius:8px;background:#0b1813;color:var(--text);cursor:pointer}
+.msg{margin-top:12px;padding:11px;border-radius:8px;background:#09140f;border:1px solid #244c39}.success{border-color:#2d9c5a;color:#80ffb2}.fail{border-color:#7a3040;color:#ff9aa7}
+.progress{height:8px;background:#06100c;border-radius:99px;overflow:hidden;margin:10px 0 18px}.progress i{display:block;height:100%;background:var(--green);width:0}
+.hint{color:var(--yellow);display:none;margin-top:12px}.terminal{min-height:100px}
+@media(max-width:800px){.grid{grid-template-columns:1fr}header{align-items:flex-start;flex-direction:column}}
+</style>
+</head>
+<body>
+<header><div><div class="logo">▣ HACKLAB</div><div class="tag">Learn offensive security in a safe local sandbox.</div></div><div><span id="score">0 / 5 solved</span></div></header>
+<main>
+<div class="grid">
+<aside class="panel"><strong>MISSIONS</strong><div class="progress"><i id="bar"></i></div>
+<button class="challenge active" data-id="auth"><b>01 · Auth Bypass</b><small>Logic / input handling</small></button>
+<button class="challenge" data-id="sqli"><b>02 · SQL Injection</b><small>Query construction</small></button>
+<button class="challenge" data-id="xss"><b>03 · XSS Detective</b><small>Output encoding</small></button>
+<button class="challenge" data-id="path"><b>04 · Path Traversal</b><small>File validation</small></button>
+<button class="challenge" data-id="headers"><b>05 · Hidden Header</b><small>HTTP reconnaissance</small></button>
+</aside>
+<section class="panel" id="content"></section>
+</div>
+</main>
+<script>
+const solved=new Set(JSON.parse(localStorage.getItem("hacklabSolved")||"[]"));
+const data={
+auth:{title:"Auth Bypass",level:"Beginner",body:`
+<p>A toy login form is vulnerable because it checks a user-controlled value incorrectly. Your job is to discover the special username that the demo accepts.</p>
+<pre>POST /login
+username=?
+password=anything</pre>
+<input id="answer" placeholder="username">
+<button class="primary" onclick="check('auth')">Attempt login</button>
+<div class="hint" id="hint">Hint: The demo's privileged account is named <b>admin</b>.</div><button class="secondary" onclick="hint('auth')">Show hint</button><div id="msg"></div>`},
+sqli:{title:"SQL Injection",level:"Beginner",body:`
+<p>This is a simulated SQL query. Nothing is sent to a server. Find an input that demonstrates why concatenating untrusted input into SQL is dangerous.</p>
+<pre>SELECT * FROM users
+WHERE username = '&lt;input&gt;'
+AND password = '&lt;password&gt;';</pre>
+<input id="answer" placeholder="Try a classic boolean condition">
+<button class="primary" onclick="check('sqli')">Test payload</button>
+<div class="hint" id="hint">Hint: Think about making the WHERE condition true without knowing the password.</div><button class="secondary" onclick="hint('sqli')">Show hint</button><div id="msg"></div>`},
+xss:{title:"XSS Detective",level:"Beginner",body:`
+<p>The page below reflects your search term into HTML without encoding. Identify a payload that would execute JavaScript in this intentionally vulnerable <b>local simulation</b>.</p>
+<input id="answer" placeholder="Enter a harmless proof-of-concept payload">
+<button class="primary" onclick="check('xss')">Inspect</button>
+<div class="hint" id="hint">Hint: A script-capable HTML element can trigger JavaScript when inserted as markup.</div><button class="secondary" onclick="hint('xss')">Show hint</button><div id="msg"></div>`},
+path:{title:"Path Traversal",level:"Beginner",body:`
+<p>A download endpoint joins a base directory with a user-controlled filename. Find the traversal sequence that would escape the intended directory in this toy example.</p>
+<pre>/downloads/&lt;filename&gt;
+base directory: /srv/app/downloads/</pre>
+<input id="answer" placeholder="Traversal sequence">
+<button class="primary" onclick="check('path')">Check</button>
+<div class="hint" id="hint">Hint: On Unix-like systems, two dots refer to the parent directory.</div><button class="secondary" onclick="hint('path')">Show hint</button><div id="msg"></div>`},
+headers:{title:"Hidden Header",level:"Beginner",body:`
+<p>Recon is often about noticing small clues. The mock response below contains a custom header that reveals the challenge token.</p>
+<pre>HTTP/1.1 200 OK
+Content-Type: text/html
+Server: nginx
+X-Lab-Token: BLUE-MOON-42</pre>
+<input id="answer" placeholder="Enter the token">
+<button class="primary" onclick="check('headers')">Submit token</button>
+<div class="hint" id="hint">Hint: Look closely at the custom <code>X-</code> header.</div><button class="secondary" onclick="hint('headers')">Show hint</button><div id="msg"></div>`}
+};
+function render(id){document.querySelectorAll(".challenge").forEach(b=>b.classList.toggle("active",b.dataset.id===id));document.getElementById("content").innerHTML=`<h1>${data[id].title} <span class="badge">${data[id].level}</span></h1>${data[id].body}`;update()}
+function hint(){document.getElementById("hint").style.display="block"}
+function check(id){
+ const v=document.getElementById("answer").value.trim();
+ let ok=false;
+ if(id==="auth") ok=v.toLowerCase()==="admin";
+ if(id==="sqli") ok=/(?:'\s*or\s+1\s*=\s*1|'\s*or\s+'1'\s*=\s*'1|--)/i.test(v);
+ if(id==="xss") ok=/<script[\s>]|onerror\s*=|onload\s*=/i.test(v);
+ if(id==="path") ok=v==="..";
+ if(id==="headers") ok=v.toUpperCase()==="BLUE-MOON-42";
+ const m=document.getElementById("msg");
+ if(ok){solved.add(id);localStorage.setItem("hacklabSolved",JSON.stringify([...solved]));m.className="msg success";m.textContent="✓ Mission solved. Nice work.";update()}
+ else{m.className="msg fail";m.textContent="✗ Not quite. Study the clue and try again."}
+}
+function update(){document.getElementById("score").textContent=`${solved.size} / 5 solved`;document.getElementById("bar").style.width=(solved.size*20)+"%"}
+document.querySelectorAll(".challenge").forEach(b=>b.onclick=()=>render(b.dataset.id));render("auth");
+</script>
+</body>
+</html>
